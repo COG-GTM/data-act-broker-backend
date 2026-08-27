@@ -10,6 +10,7 @@ from dataactbroker.handlers.fileHandler import (
     get_upload_file_url,
     get_detached_upload_file_url,
     get_submission_comments,
+    submission_analyst_report_url,
     submission_report_url,
     update_submission_comments,
     list_history,
@@ -41,7 +42,7 @@ from dataactbroker.permissions import (
 )
 
 from dataactcore.interfaces.function_bag import get_fabs_meta
-from dataactcore.models.lookups import FILE_TYPE_DICT, FILE_TYPE_DICT_LETTER
+from dataactcore.models.lookups import ANALYST_REPORT_FILENAMES, FILE_TYPE_DICT, FILE_TYPE_DICT_LETTER
 from dataactcore.utils.jsonResponse import JsonResponse
 from dataactcore.utils.requestDictionary import RequestDictionary
 from dataactcore.utils.statusCode import StatusCode
@@ -258,6 +259,20 @@ def add_file_routes(app, is_local, server_path):
         warning = kwargs.get("warning")
         cross_type = kwargs.get("cross_type")
         return submission_report_url(submission, bool(warning), file_type, cross_type)
+
+    @app.route("/v1/analyst_report_url/", methods=["GET"])
+    @convert_to_submission_id
+    @requires_submission_perms("reader")
+    @parser.use_kwargs(
+        {
+            "report_name": webargs_fields.String(
+                required=True, validate=webargs_validate.OneOf(ANALYST_REPORT_FILENAMES.keys())
+            )
+        },
+        location="query",
+    )
+    def post_submission_analyst_report_url(submission, report_name, **kwargs):
+        return submission_analyst_report_url(submission, report_name)
 
     @app.route("/v1/get_file_url/", methods=["GET"])
     @convert_to_submission_id

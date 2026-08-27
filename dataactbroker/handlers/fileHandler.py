@@ -77,7 +77,7 @@ from dataactcore.models.views import SubmissionUpdatedView
 
 from dataactcore.utils import fileD2
 from dataactcore.utils.jsonResponse import JsonResponse
-from dataactcore.utils.report import report_file_name
+from dataactcore.utils.report import analyst_report_file_name, report_file_name
 from dataactcore.utils.requestDictionary import RequestDictionary
 from dataactcore.utils.ResponseError import ResponseError
 from dataactcore.utils.statusCode import StatusCode
@@ -2717,6 +2717,24 @@ def submission_report_url(submission, warning, file_type, cross_type):
 
     # Get the url
     file_name = report_file_name(submission.submission_id, warning, file_type, cross_type)
+    if CONFIG_BROKER["local"]:
+        url = os.path.join(CONFIG_SERVICES["error_report_path"], file_name)
+    else:
+        url = S3Handler().get_signed_url("errors", file_name, url_mapping=CONFIG_BROKER["submission_bucket_mapping"])
+    return JsonResponse.create(StatusCode.OK, {"url": url})
+
+
+def submission_analyst_report_url(submission, report_name):
+    """Gets the signed URL for the specified analyst report
+
+    Args:
+        submission: the submission to get the file for
+        report_name: the name of the analyst report
+
+    Returns:
+        A signed URL to S3 of the specified file when not run locally. The path to the file when run locally.
+    """
+    file_name = analyst_report_file_name(submission, report_name)
     if CONFIG_BROKER["local"]:
         url = os.path.join(CONFIG_SERVICES["error_report_path"], file_name)
     else:

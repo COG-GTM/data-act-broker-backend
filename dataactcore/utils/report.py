@@ -1,7 +1,13 @@
 from dataactcore.interfaces.db import GlobalDB
 from dataactcore.interfaces.function_bag import filename_fyp_sub_format
 from dataactcore.models.jobModels import Submission, Job, FormatChangeDate
-from dataactcore.models.lookups import FILE_TYPE_DICT_NAME_LETTER, JOB_TYPE_DICT, FILE_TYPE_DICT, REPORT_FILENAMES
+from dataactcore.models.lookups import (
+    ANALYST_REPORT_FILENAMES,
+    FILE_TYPE_DICT_NAME_LETTER,
+    JOB_TYPE_DICT,
+    FILE_TYPE_DICT,
+    REPORT_FILENAMES,
+)
 
 
 def report_file_name(submission_id, warning, file_type, cross_type=None):
@@ -59,3 +65,17 @@ def report_file_name(submission_id, warning, file_type, cross_type=None):
     ew_type = "cross-file" if cross_type else "file"
 
     return REPORT_FILENAMES[ew_version][ew_type].format(**fillin_vals)
+
+
+def analyst_report_file_name(submission, report_name):
+    """Format the csv file name of an analyst report for the requested submission
+
+    Args:
+        submission: the submission the report was generated for
+        report_name: the name of the analyst report
+
+    Returns:
+        string of the report file name
+    """
+    fyp = "_{}".format(filename_fyp_sub_format(submission)) if not submission.is_fabs else ""
+    return ANALYST_REPORT_FILENAMES[report_name].format(submission_id=submission.submission_id, FYP=fyp)

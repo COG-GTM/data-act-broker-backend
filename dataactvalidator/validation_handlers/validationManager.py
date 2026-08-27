@@ -65,6 +65,7 @@ from dataactcore.models.validationModels import RuleSql, ValidationLabel
 
 from dataactcore.utils.ResponseError import ResponseError
 from dataactcore.utils.jsonResponse import JsonResponse
+from dataactcore.utils.analyst_reports import write_burn_rate_report, write_unmatched_obligation_report
 from dataactcore.utils.report import report_file_name
 from dataactcore.utils.loader_utils import insert_dataframe
 from dataactcore.utils.statusCode import StatusCode
@@ -1276,6 +1277,9 @@ class ValidationManager:
 
             pairs_finished += 1
 
+        # generate the analyst reports summarizing where obligations are drifting away from File B and from plan
+        self.generate_analyst_reports(submission_id)
+
         # write all recorded errors to database
         write_all_row_errors(error_list, job_id)
         # Update error info for submission
@@ -1309,6 +1313,26 @@ class ValidationManager:
 
         # Mark validation complete
         mark_file_complete(job_id)
+
+    def generate_analyst_reports(self, submission_id):
+        """Generate the analyst reports summarizing the cross-file results for the submission.
+
+        Args:
+            submission_id: the submission to generate the reports for
+        """
+        sess = GlobalDB.db().session
+        submission = sess.query(Submission).filter_by(submission_id=submission_id).one()
+        report_path = CONFIG_SERVICES["error_report_path"]
+
+        for write_report in (write_unmatched_obligation_report, write_burn_rate_report):
+            file_name = write_report(submission, report_path)
+            file_path = "".join([report_path, file_name])
+
+            # upload file to S3 when not local
+            if not self.is_local:
+                s3 = boto3.client("s3", region_name=CONFIG_BROKER["aws_region"])
+                s3.upload_file(file_path, CONFIG_BROKER["aws_bucket"], self.get_file_name(file_name))
+                os.remove(file_path)
 
     def validate_job(self, job_id):
         """Gets file for job, validates each row, and sends valid rows to a staging table

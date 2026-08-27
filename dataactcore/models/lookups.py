@@ -137,6 +137,12 @@ REPORT_FILENAMES = {
     },
 }
 
+# Analyst-facing summary reports built on top of the validation results, named in the current (DEV-8325) style
+ANALYST_REPORT_FILENAMES = {
+    "unmatched_obligations": "SubID-{submission_id}_File-C-to-B-unmatched-obligations-report{FYP}.csv",
+    "burn_rate": "SubID-{submission_id}_File-B-burn-rate-report{FYP}.csv",
+}
+
 PERMISSION_TYPES = [
     LookupType(1, "reader", "This user is allowed to view any submission for their agency"),
     LookupType(2, "writer", "This user is allowed to create and edit any submission for their agency"),
