@@ -14,6 +14,7 @@ from dataactcore.utils.analyst_reports import (
     UNMATCHED_OBLIGATION_HEADERS,
     UNMATCHED_OBLIGATION_RULE_LABEL,
     burn_rate_rows,
+    fiscal_year_submissions,
     unmatched_obligations,
     write_burn_rate_report,
     write_unmatched_obligation_report,
@@ -304,3 +305,32 @@ def test_write_burn_rate_report_includes_published_periods(database, tmpdir):
     assert rows[2][3] == "6"
     assert rows[2][11] == AHEAD_OF_PLAN
     assert "ahead of plan" in rows[2][12]
+
+
+def test_fiscal_year_submissions_one_submission_per_period(database):
+    """A period reported by more than one submission is only counted once, using the most recent submission"""
+    populate_publish_status(database)
+
+    submissions = [
+        SubmissionFactory(
+            submission_id=submission_id,
+            cgac_code="097",
+            frec_code=None,
+            reporting_fiscal_year=2025,
+            reporting_fiscal_period=period,
+            is_fabs=False,
+            publish_status_id=PUBLISH_STATUS_DICT[publish_status],
+        )
+        for submission_id, period, publish_status in (
+            (1, 3, "published"),
+            (2, 3, "updated"),
+            (3, 6, "published"),
+            (4, 6, "unpublished"),
+        )
+    ]
+    database.session.add_all(submissions)
+    database.session.commit()
+
+    fy_submissions = fiscal_year_submissions(submissions[3])
+
+    assert [(sub.submission_id, is_current) for sub, is_current in fy_submissions] == [(2, False), (4, True)]

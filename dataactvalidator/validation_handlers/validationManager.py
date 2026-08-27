@@ -1328,6 +1328,7 @@ class ValidationManager:
         report_path = CONFIG_SERVICES["error_report_path"]
 
         for write_report in (write_unmatched_obligation_report, write_burn_rate_report):
+            file_path = None
             try:
                 file_name = write_report(submission, report_path)
                 file_path = "".join([report_path, file_name])
@@ -1336,8 +1337,9 @@ class ValidationManager:
                 if not self.is_local:
                     s3 = boto3.client("s3", region_name=CONFIG_BROKER["aws_region"])
                     s3.upload_file(file_path, CONFIG_BROKER["aws_bucket"], self.get_file_name(file_name))
-                    os.remove(file_path)
             except Exception:
+                # roll back so a failed report query doesn't leave the transaction aborted for the rest of the job
+                sess.rollback()
                 logger.exception(
                     {
                         "message": "Unable to generate analyst report on submission_id: " + str(submission_id),

@@ -215,13 +215,15 @@ def fiscal_year_submissions(submission):
     """Get the submissions making up the fiscal year to date for the submission's agency.
 
     Only published submissions are included alongside the submission being validated, since unpublished data for
-    another period is still being worked on.
+    another period is still being worked on. A period reported more than once (a republished period, or a period
+    also covered by the submission being validated) is represented by its most recent submission only, so the
+    fiscal year to date is never double counted.
 
     Args:
         submission: the submission being validated
 
     Returns:
-        A list of (submission, is_current) tuples ordered by period
+        A list of (submission, is_current) tuples, one per period, ordered by period
     """
     sess = GlobalDB.db().session
 
@@ -237,10 +239,12 @@ def fiscal_year_submissions(submission):
     else:
         published_subs = published_subs.filter(Submission.frec_code == submission.frec_code)
 
-    fy_submissions = [(published_sub, False) for published_sub in published_subs.all()]
-    fy_submissions.append((submission, True))
+    by_period = {}
+    for published_sub in published_subs.order_by(Submission.submission_id).all():
+        by_period[published_sub.reporting_fiscal_period] = (published_sub, False)
+    by_period[submission.reporting_fiscal_period] = (submission, True)
 
-    return sorted(fy_submissions, key=lambda sub: sub[0].reporting_fiscal_period)
+    return sorted(by_period.values(), key=lambda sub: sub[0].reporting_fiscal_period)
 
 
 def program_activity_obligations(sub, is_current):
