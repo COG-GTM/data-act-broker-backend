@@ -96,6 +96,18 @@ def test_update_account_nums_bad_dates(database, factory):
     assert model.account_num is None
 
 
+def test_generate_analyst_reports_does_not_fail_validation(database):
+    """A report that can't be generated is logged rather than failing the validation it summarizes"""
+    sess = database.session
+    # the B30 rule the exception report runs isn't loaded, so generating that report fails
+    submission = SubmissionFactory(reporting_start_date=date(2010, 10, 1), reporting_end_date=date(2010, 10, 1))
+    sess.add(submission)
+    sess.commit()
+
+    validation_manager = validationManager.ValidationManager(is_local=CONFIG_BROKER["local"])
+    validation_manager.generate_analyst_reports(submission.submission_id)
+
+
 @pytest.mark.usefixtures("database")
 def test_attempt_validate_deleted_job():
     error = None

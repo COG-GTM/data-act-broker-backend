@@ -1317,6 +1317,9 @@ class ValidationManager:
     def generate_analyst_reports(self, submission_id):
         """Generate the analyst reports summarizing the cross-file results for the submission.
 
+        These reports summarize results the validation already recorded, so a failure to generate them is logged and
+        does not fail the validation itself.
+
         Args:
             submission_id: the submission to generate the reports for
         """
@@ -1325,14 +1328,25 @@ class ValidationManager:
         report_path = CONFIG_SERVICES["error_report_path"]
 
         for write_report in (write_unmatched_obligation_report, write_burn_rate_report):
-            file_name = write_report(submission, report_path)
-            file_path = "".join([report_path, file_name])
+            try:
+                file_name = write_report(submission, report_path)
+                file_path = "".join([report_path, file_name])
 
-            # upload file to S3 when not local
-            if not self.is_local:
-                s3 = boto3.client("s3", region_name=CONFIG_BROKER["aws_region"])
-                s3.upload_file(file_path, CONFIG_BROKER["aws_bucket"], self.get_file_name(file_name))
-                os.remove(file_path)
+                # upload file to S3 when not local
+                if not self.is_local:
+                    s3 = boto3.client("s3", region_name=CONFIG_BROKER["aws_region"])
+                    s3.upload_file(file_path, CONFIG_BROKER["aws_bucket"], self.get_file_name(file_name))
+                    os.remove(file_path)
+            except Exception:
+                logger.exception(
+                    {
+                        "message": "Unable to generate analyst report on submission_id: " + str(submission_id),
+                        "message_type": "ValidatorWarning",
+                        "submission_id": submission_id,
+                        "action": "generate_analyst_reports",
+                        "report": write_report.__name__,
+                    }
+                )
 
     def validate_job(self, job_id):
         """Gets file for job, validates each row, and sends valid rows to a staging table
