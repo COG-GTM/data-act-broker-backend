@@ -1349,6 +1349,10 @@ class ValidationManager:
                         "report": write_report.__name__,
                     }
                 )
+            finally:
+                # the local copy is only the source of the upload, so it's cleaned up either way
+                if not self.is_local and file_path and os.path.exists(file_path):
+                    os.remove(file_path)
 
     def validate_job(self, job_id):
         """Gets file for job, validates each row, and sends valid rows to a staging table
