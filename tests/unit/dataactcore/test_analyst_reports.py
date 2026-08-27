@@ -9,10 +9,12 @@ from dataactcore.utils.analyst_reports import (
     AHEAD_OF_PLAN,
     BEHIND_PLAN,
     BURN_RATE_HEADERS,
+    NO_BASELINE,
     NO_PLAN,
     ON_PLAN,
     UNMATCHED_OBLIGATION_HEADERS,
     UNMATCHED_OBLIGATION_RULE_LABEL,
+    burn_rate_note,
     burn_rate_rows,
     fiscal_year_submissions,
     unmatched_obligations,
@@ -238,6 +240,60 @@ def test_burn_rate_rows_no_amount_available(database):
     assert rows[0]["straight_line_plan"] == Decimal(0)
     assert rows[0]["variance_pct"] is None
     assert rows[0]["status"] == NO_PLAN
+
+
+def test_burn_rate_rows_no_program_activity_baseline(database):
+    """A program activity with no baseline share is distinguished from a TAS with no File A amount at all"""
+    populate_publish_status(database)
+
+    published_sub = SubmissionFactory(
+        submission_id=1,
+        cgac_code="097",
+        frec_code=None,
+        reporting_fiscal_year=2025,
+        reporting_fiscal_period=3,
+        is_fabs=False,
+        publish_status_id=PUBLISH_STATUS_DICT["published"],
+    )
+    current_sub = SubmissionFactory(
+        submission_id=2,
+        cgac_code="097",
+        frec_code=None,
+        reporting_fiscal_year=2025,
+        reporting_fiscal_period=6,
+        is_fabs=False,
+        publish_status_id=PUBLISH_STATUS_DICT["unpublished"],
+    )
+    database.session.add_all(
+        [
+            published_sub,
+            current_sub,
+            PublishedAppropriationFactory(submission_id=1, display_tas="097-1234", total_budgetary_resources_cpe=1000),
+            PublishedObjectClassProgramActivityFactory(
+                submission_id=1,
+                display_tas="097-1234",
+                program_activity_code="0001",
+                program_activity_name="PA1",
+                obligations_incurred_by_pr_cpe=-250,
+            ),
+            AppropriationFactory(submission_id=2, display_tas="097-1234", total_budgetary_resources_cpe=1000),
+            # PA2 wasn't reported in the baseline period, so it has no share of the account
+            ObjectClassProgramActivityFactory(
+                submission_id=2,
+                display_tas="097-1234",
+                program_activity_code="0002",
+                program_activity_name="PA2",
+                obligations_incurred_by_pr_cpe=-100,
+            ),
+        ]
+    )
+    database.session.commit()
+
+    row = [row for row in burn_rate_rows(current_sub) if row["program_activity_code"] == "0002"][0]
+
+    assert row["status"] == NO_BASELINE
+    assert row["tas_amount_available"] == Decimal(1000)
+    assert "reported no obligations in period 3" in burn_rate_note(row)
 
 
 def test_write_burn_rate_report_includes_published_periods(database, tmpdir):

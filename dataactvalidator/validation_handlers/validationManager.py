@@ -65,8 +65,8 @@ from dataactcore.models.validationModels import RuleSql, ValidationLabel
 
 from dataactcore.utils.ResponseError import ResponseError
 from dataactcore.utils.jsonResponse import JsonResponse
-from dataactcore.utils.analyst_reports import write_burn_rate_report, write_unmatched_obligation_report
-from dataactcore.utils.report import report_file_name
+from dataactcore.utils.analyst_reports import ANALYST_REPORT_WRITERS
+from dataactcore.utils.report import analyst_report_file_name, report_file_name
 from dataactcore.utils.loader_utils import insert_dataframe
 from dataactcore.utils.statusCode import StatusCode
 
@@ -1327,11 +1327,12 @@ class ValidationManager:
         submission = sess.query(Submission).filter_by(submission_id=submission_id).one()
         report_path = CONFIG_SERVICES["error_report_path"]
 
-        for write_report in (write_unmatched_obligation_report, write_burn_rate_report):
-            file_path = None
+        for report_name, write_report in ANALYST_REPORT_WRITERS.items():
+            # resolved up front so a report that fails partway through writing is still cleaned up
+            file_name = analyst_report_file_name(submission, report_name)
+            file_path = "".join([report_path, file_name])
             try:
-                file_name = write_report(submission, report_path)
-                file_path = "".join([report_path, file_name])
+                write_report(submission, report_path)
 
                 # upload file to S3 when not local
                 if not self.is_local:
@@ -1346,12 +1347,12 @@ class ValidationManager:
                         "message_type": "ValidatorWarning",
                         "submission_id": submission_id,
                         "action": "generate_analyst_reports",
-                        "report": write_report.__name__,
+                        "report": report_name,
                     }
                 )
             finally:
                 # the local copy is only the source of the upload, so it's cleaned up either way
-                if not self.is_local and file_path and os.path.exists(file_path):
+                if not self.is_local and os.path.exists(file_path):
                     os.remove(file_path)
 
     def validate_job(self, job_id):

@@ -71,6 +71,7 @@ ON_PLAN = "On plan"
 AHEAD_OF_PLAN = "Ahead of plan"
 BEHIND_PLAN = "Behind plan"
 NO_PLAN = "No amount available in File A"
+NO_BASELINE = "No program activity baseline"
 
 
 def agency_name(submission):
@@ -363,7 +364,7 @@ def burn_rate_rows(submission, materiality=BURN_RATE_MATERIALITY_THRESHOLD):
             variance_pct = variance / straight_line if straight_line else None
 
             if variance_pct is None:
-                status = NO_PLAN
+                status = NO_PLAN if not available_by_tas.get(tas) else NO_BASELINE
             elif abs(variance_pct) <= materiality:
                 status = ON_PLAN
             elif variance_pct > 0:
@@ -401,13 +402,13 @@ def burn_rate_note(row):
     Returns:
         A sentence explaining how execution compares to a straight-line plan
     """
-    if row["status"] == NO_PLAN and not row["tas_amount_available"]:
+    if row["status"] == NO_PLAN:
         return (
             "No amount available was reported in File A for {}, so there is nothing to measure {} of obligations "
             "against.".format(row["tas"], format_currency(row["cumulative_obligations"]))
         )
 
-    if row["status"] == NO_PLAN:
+    if row["status"] == NO_BASELINE:
         return (
             "This program activity reported no obligations in period {}, the first period of the fiscal year "
             "reported for {}, so it has no share of the account's amount available to measure {} of obligations "
@@ -463,3 +464,10 @@ def write_burn_rate_report(submission, report_path):
             )
 
     return file_name
+
+
+# The report each writer produces, keyed the way the report file names and download route are
+ANALYST_REPORT_WRITERS = {
+    "unmatched_obligations": write_unmatched_obligation_report,
+    "burn_rate": write_burn_rate_report,
+}
